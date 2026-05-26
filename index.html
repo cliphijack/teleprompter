@@ -380,7 +380,7 @@ function scrollStep(ts) {
   lastTime = ts;
   if (!manualScrollLock) {
     const speed = parseInt(speedRange.value);
-    prompterScroll.scrollTop += speed * dt / 16.67; // 속도 기준 60fps
+    prompterScroll.scrollTop += speed * dt / 100; // 기존 100ms interval 속도 기준 유지
   }
   rafId = requestAnimationFrame(scrollStep);
 }
