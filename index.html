@@ -134,7 +134,7 @@
     <span id="font-val">36px</span>
     너비 <input type="range" id="width-range" min="10" max="40" value="20">
     <span id="width-val">20자</span>
-    속도 <input type="range" id="speed-range" min="1" max="10" value="2">
+    속도 <input type="range" id="speed-range" min="1" max="20" value="2">
     <span id="speed-val">2</span>
   </div>
 
@@ -413,7 +413,7 @@ document.addEventListener('keydown', (e) => {
   if (mode !== 'keyboard') return;
   switch (e.code) {
     case 'Space': e.preventDefault(); scrollInterval ? stopScroll() : startScroll(); break;
-    case 'ArrowUp':   e.preventDefault(); if (+speedRange.value<10){ speedRange.value=+speedRange.value+1; speedVal.textContent=speedRange.value; if(scrollInterval){stopScroll();startScroll();} } break;
+    case 'ArrowUp':   e.preventDefault(); if (+speedRange.value<20){ speedRange.value=+speedRange.value+1; speedVal.textContent=speedRange.value; if(scrollInterval){stopScroll();startScroll();} } break;
     case 'ArrowDown': e.preventDefault(); if (+speedRange.value>1) { speedRange.value=+speedRange.value-1; speedVal.textContent=speedRange.value; if(scrollInterval){stopScroll();startScroll();} } break;
     case 'ArrowLeft':  e.preventDefault(); prompterScroll.scrollTop -= 80; break;
     case 'ArrowRight': e.preventDefault(); prompterScroll.scrollTop += 80; break;
