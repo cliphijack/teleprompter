@@ -344,7 +344,7 @@ btnAlignLeft.onclick   = () => { prompterText.style.textAlign='left';   btnAlign
 btnAlignCenter.onclick = () => { prompterText.style.textAlign='center'; btnAlignCenter.classList.add('active'); btnAlignLeft.classList.remove('active'); };
 widthRange.oninput  = () => { if(!eyeFixMode) prompterText.style.maxWidth=widthRange.value+'em'; widthVal.textContent=widthRange.value+'자'; };
 fontRange.oninput   = () => { prompterText.style.fontSize=fontRange.value+'px'; editor.style.fontSize=fontRange.value+'px'; fontVal.textContent=fontRange.value+'px'; };
-speedRange.oninput  = () => { speedVal.textContent=speedRange.value; if(scrollInterval){stopScroll();startScroll();} };
+speedRange.oninput  = () => { speedVal.textContent=speedRange.value; };
 
 // 수동 스크롤 잠금 (음성·키보드 모드)
 ['wheel','touchstart'].forEach(evt =>
@@ -370,15 +370,30 @@ function buildPrompter(text) {
   prompterScroll.scrollTop = 0;
 }
 
-// ── 스크롤 ───────────────────────────────────────────────────
+// ── 스크롤 (requestAnimationFrame 60fps) ─────────────────────
+let rafId = null;
+let lastTime = null;
+
+function scrollStep(ts) {
+  if (!lastTime) lastTime = ts;
+  const dt = ts - lastTime;
+  lastTime = ts;
+  if (!manualScrollLock) {
+    const speed = parseInt(speedRange.value);
+    prompterScroll.scrollTop += speed * dt / 16.67; // 속도 기준 60fps
+  }
+  rafId = requestAnimationFrame(scrollStep);
+}
+
 function startScroll() {
-  if (scrollInterval) return;
-  const speed = parseInt(speedRange.value);
-  scrollInterval = setInterval(() => { if(!manualScrollLock) prompterScroll.scrollTop+=speed; }, 100);
+  if (rafId) return;
+  lastTime = null;
+  rafId = requestAnimationFrame(scrollStep);
   statusText.textContent = '스크롤 중 ▶'; indicator.classList.add('active');
 }
 function stopScroll() {
-  clearInterval(scrollInterval); scrollInterval=null;
+  if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+  lastTime = null;
   statusText.textContent='정지'; indicator.classList.remove('active');
 }
 function stopAll() {
