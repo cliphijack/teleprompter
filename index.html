@@ -91,7 +91,7 @@
   /* 탭 오버레이 (탭 모드에서 전체 터치 영역) */
   #tap-overlay {
     position: absolute; inset: 0; display: none; z-index: 10;
-    touch-action: manipulation;
+    touch-action: pan-y;
   }
 
   /* 탭 힌트 */
@@ -220,8 +220,15 @@ function setMode(m) {
   }
 }
 
-// ── 탭 오버레이 ──────────────────────────────────────────────
-tapOverlay.addEventListener('click', () => {
+// ── 탭 오버레이 (탭 vs 스와이프 구분) ───────────────────────
+let tapStartY = 0;
+tapOverlay.addEventListener('touchstart', (e) => {
+  tapStartY = e.touches[0].clientY;
+}, { passive: true });
+
+tapOverlay.addEventListener('touchend', (e) => {
+  const dy = Math.abs(e.changedTouches[0].clientY - tapStartY);
+  if (dy > 10) return; // 스와이프면 무시
   if (scrollInterval) {
     stopScroll();
     showTapHint('탭 — 정지');
@@ -229,7 +236,7 @@ tapOverlay.addEventListener('click', () => {
     startScroll();
     showTapHint('탭 — 스크롤 중');
   }
-});
+}, { passive: true });
 
 function showTapHint(msg) {
   tapHint.textContent = msg;
