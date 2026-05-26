@@ -133,8 +133,8 @@
       <span id="font-val">36px</span>
       너비 <input type="range" id="width-range" min="10" max="40" value="20">
       <span id="width-val">20자</span>
-      속도 <input type="range" id="speed-range" min="1" max="20" value="2">
-      <span id="speed-val">2</span>
+      속도 <input type="range" id="speed-range" min="1" max="20" value="5">
+      <span id="speed-val">5</span>
     </div>
     <div id="status"><span id="indicator"></span><span id="status-text">대기 중</span></div>
     <div id="shortcut-hint" style="display:none">Space: 시작/정지 &nbsp;|&nbsp; ↑↓: 속도 &nbsp;|&nbsp; ←→: 스크롤 &nbsp;|&nbsp; R: 처음으로</div>
@@ -337,7 +337,7 @@ function buildPrompter(text) {
 function startScroll() {
   if (scrollInterval) return;
   scrollInterval = setInterval(() => {
-    prompterScroll.scrollTop += parseInt(speedRange.value);
+    prompterScroll.scrollTop += parseFloat(speedRange.value) * 0.5;
   }, 50);
   statusText.textContent = '스크롤 중 ▶'; indicator.classList.add('active');
 }
