@@ -359,10 +359,21 @@ function startRecognition() {
   recognition.lang = 'ko-KR'; recognition.continuous = true; recognition.interimResults = true;
   recognition.onstart = () => { isRecognizing=true; indicator.classList.add('active'); statusText.textContent='음성 감지 중...'; };
   recognition.onend   = () => { indicator.classList.remove('active'); if(isRecognizing) setTimeout(()=>{ try{recognition.start();}catch(e){} }, 300); };
-  recognition.onresult = () => {
-    startScroll();
+
+  // 발화 시작 → 즉시 스크롤 (pending 정지 타이머 취소)
+  recognition.onspeechstart = () => {
     clearTimeout(speechTimeout);
-    speechTimeout = setTimeout(() => stopScroll(), 1500);
+    startScroll();
+  };
+  // 인식 결과 도착 → 정지 타이머 2초 연장 (trailing result 처리)
+  recognition.onresult = () => {
+    clearTimeout(speechTimeout);
+    speechTimeout = setTimeout(() => stopScroll(), 2000);
+  };
+  // 발화 끝 → 2초 후 정지 (onresult가 더 늦게 오면 그쪽이 덮어씀)
+  recognition.onspeechend = () => {
+    clearTimeout(speechTimeout);
+    speechTimeout = setTimeout(() => stopScroll(), 2000);
   };
   try { recognition.start(); } catch(e) {}
 }
