@@ -21,7 +21,8 @@
   /* ── 프롬프터 ── */
   #prompter-view { flex: 1; overflow: hidden; display: none; position: relative; min-height: 0; }
   #prompter-scroll {
-    height: 100%; overflow-y: auto; overflow-x: hidden;
+    height: 100%; overflow-y: scroll; overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
     padding: 30px 40px;
     scrollbar-width: none;
     display: flex; flex-direction: column; align-items: center;
