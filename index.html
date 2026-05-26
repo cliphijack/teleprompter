@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<title>프롬프터</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { font-family: 'Noto Sans KR', -apple-system, sans-serif; background: #111; color: #eee; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
+
+  /* ── 툴바 ── */
+  #toolbar {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    padding: 10px 14px; background: #1a1a1a; border-bottom: 1px solid #333;
+    flex-shrink: 0;
+  }
+  #toolbar button {
+    padding: 8px 14px; border: none; border-radius: 8px; cursor: pointer;
+    font-size: 13px; font-weight: 700; touch-action: manipulation;
+  }
+  @media (max-width: 600px) {
+    #toolbar button { padding: 10px 12px; font-size: 12px; }
+    #toolbar { gap: 6px; padding: 8px 10px; }
+  }
+
+  #btn-edit    { background: #333; color: #eee; }
+  #btn-start   { background: #2ecc71; color: #111; }
+  #btn-stop    { background: #e74c3c; color: #fff; display: none; }
+  #btn-load    { background: #3498db; color: #fff; }
+  #btn-save    { background: #555; color: #eee; }
+  #btn-align-left, #btn-align-center { background: #333; color: #aaa; }
+  #btn-align-left.active, #btn-align-center.active { background: #555; color: #fff; }
+  #btn-eye-fix { background: #333; color: #aaa; }
+  #btn-eye-fix.active { background: #8e44ad; color: #fff; }
+
+  /* 모드 토글 */
+  #mode-toggle { display: flex; border-radius: 8px; overflow: hidden; border: 1px solid #444; }
+  #mode-toggle button {
+    border: none; padding: 8px 12px; cursor: pointer; font-size: 12px; font-weight: 700;
+    background: #333; color: #666; border-radius: 0; touch-action: manipulation;
+  }
+  #mode-toggle button.active { background: #f39c12; color: #111; }
+
+  #file-input { display: none; }
+
+  /* 슬라이더 컨트롤 */
+  #controls { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #aaa; flex-wrap: wrap; }
+  #controls input[type=range] { width: 70px; accent-color: #2ecc71; }
+  @media (max-width: 600px) { #controls input[type=range] { width: 55px; } }
+
+  #eye-fix-ctrl { display: none; align-items: center; gap: 6px; font-size: 12px; color: #aaa; }
+  #eye-fix-ctrl input[type=range] { width: 80px; accent-color: #8e44ad; }
+
+  /* 상태 */
+  #status { margin-left: auto; font-size: 12px; color: #888; white-space: nowrap; display: flex; align-items: center; gap: 4px; }
+  #indicator { width: 9px; height: 9px; border-radius: 50%; background: #555; flex-shrink: 0; }
+  #indicator.active { background: #2ecc71; animation: pulse 0.8s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  #shortcut-hint { width: 100%; font-size: 11px; color: #555; margin-top: 2px; }
+
+  /* ── 에디터 ── */
+  #editor-view { flex: 1; display: flex; flex-direction: column; padding: 14px; gap: 10px; min-height: 0; }
+  #editor {
+    flex: 1; background: #1e1e1e; color: #eee; border: 1px solid #333;
+    border-radius: 10px; padding: 14px; font-size: 15px; line-height: 1.7;
+    resize: none; outline: none; min-height: 0;
+  }
+
+  /* ── 프롬프터 ── */
+  #prompter-view {
+    flex: 1; overflow: hidden; display: none; position: relative; min-height: 0;
+  }
+  #prompter-scroll {
+    height: 100%; overflow-y: auto; overflow-x: hidden;
+    padding: 30px 40px;
+    scrollbar-width: none;
+    display: flex; flex-direction: column; align-items: center;
+  }
+  @media (max-width: 600px) {
+    #prompter-scroll { padding: 24px 20px; }
+  }
+  #prompter-scroll::-webkit-scrollbar { display: none; }
+  #prompter-text {
+    font-size: 36px; line-height: 1.9; color: #ddd; white-space: pre-wrap;
+    padding-bottom: 60dvh; width: 100%; max-width: 20em; word-break: keep-all;
+  }
+
+  /* 탭 오버레이 (탭 모드에서 전체 터치 영역) */
+  #tap-overlay {
+    position: absolute; inset: 0; display: none; z-index: 10;
+    touch-action: manipulation;
+  }
+
+  /* 탭 힌트 */
+  #tap-hint {
+    position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,0.6); color: #aaa; font-size: 13px;
+    padding: 8px 20px; border-radius: 20px; pointer-events: none;
+    opacity: 1; transition: opacity 0.5s;
+  }
+  #tap-hint.hidden { opacity: 0; }
+</style>
+</head>
+<body>
+
+<div id="toolbar">
+  <button id="btn-load">📂 로드</button>
+  <button id="btn-save">💾 저장</button>
+  <input type="file" id="file-input" accept=".txt,.md">
+  <button id="btn-edit">✏️ 편집</button>
+  <button id="btn-start">▶ 시작</button>
+  <button id="btn-stop">■ 정지</button>
+
+  <div id="mode-toggle">
+    <button id="btn-mode-voice" class="active">🎙 음성인식</button>
+    <button id="btn-mode-tap">📱 터치</button>
+    <button id="btn-mode-keyboard">🖥 키보드조작</button>
+  </div>
+
+  <button id="btn-align-left" class="active">≡L</button>
+  <button id="btn-align-center">≡C</button>
+  <button id="btn-eye-fix">👁</button>
+
+  <div id="eye-fix-ctrl">
+    너비 <input type="range" id="eye-width-range" min="200" max="1200" value="600" step="20">
+    <span id="eye-width-val">600px</span>
+  </div>
+
+  <div id="controls">
+    크기 <input type="range" id="font-range" min="20" max="100" value="36">
+    <span id="font-val">36px</span>
+    너비 <input type="range" id="width-range" min="10" max="40" value="20">
+    <span id="width-val">20자</span>
+    속도 <input type="range" id="speed-range" min="1" max="10" value="2">
+    <span id="speed-val">2</span>
+  </div>
+
+  <div id="status"><span id="indicator"></span><span id="status-text">대기 중</span></div>
+  <div id="shortcut-hint" style="display:none">Space: 시작/정지 &nbsp;|&nbsp; ↑↓: 속도 &nbsp;|&nbsp; ←→: 스크롤 &nbsp;|&nbsp; R: 처음으로</div>
+</div>
+
+<div id="editor-view">
+  <textarea id="editor" placeholder="여기에 대본을 붙여넣거나 파일을 로드하세요..."></textarea>
+</div>
+
+<div id="prompter-view">
+  <div id="tap-overlay"></div>
+  <div id="prompter-scroll">
+    <div id="prompter-text"></div>
+  </div>
+  <div id="tap-hint">화면을 탭하면 시작/정지</div>
+</div>
+
+<script>
+const editor        = document.getElementById('editor');
+const prompterView  = document.getElementById('prompter-view');
+const editorView    = document.getElementById('editor-view');
+const prompterText  = document.getElementById('prompter-text');
+const prompterScroll= document.getElementById('prompter-scroll');
+const btnStart      = document.getElementById('btn-start');
+const btnStop       = document.getElementById('btn-stop');
+const btnEdit       = document.getElementById('btn-edit');
+const btnLoad       = document.getElementById('btn-load');
+const btnSave       = document.getElementById('btn-save');
+const fileInput     = document.getElementById('file-input');
+const fontRange     = document.getElementById('font-range');
+const fontVal       = document.getElementById('font-val');
+const widthRange    = document.getElementById('width-range');
+const widthVal      = document.getElementById('width-val');
+const speedRange    = document.getElementById('speed-range');
+const speedVal      = document.getElementById('speed-val');
+const btnAlignLeft  = document.getElementById('btn-align-left');
+const btnAlignCenter= document.getElementById('btn-align-center');
+const btnEyeFix     = document.getElementById('btn-eye-fix');
+const eyeFixCtrl    = document.getElementById('eye-fix-ctrl');
+const eyeWidthRange = document.getElementById('eye-width-range');
+const eyeWidthVal   = document.getElementById('eye-width-val');
+const indicator     = document.getElementById('indicator');
+const statusText    = document.getElementById('status-text');
+const btnModeVoice  = document.getElementById('btn-mode-voice');
+const btnModeTap    = document.getElementById('btn-mode-tap');
+const btnModeKeyboard = document.getElementById('btn-mode-keyboard');
+const shortcutHint  = document.getElementById('shortcut-hint');
+const tapOverlay    = document.getElementById('tap-overlay');
+const tapHint       = document.getElementById('tap-hint');
+
+let loadedFileName = 'script';
+let eyeFixMode  = false;
+let mode        = 'voice'; // 'voice' | 'tap' | 'keyboard'
+let recognition = null;
+let isRecognizing = false;
+let speechTimeout = null;
+let scrollInterval = null;
+let manualScrollLock = false;
+let manualScrollTimer = null;
+let tapHintTimer = null;
+
+// ── 모드 전환 ────────────────────────────────────────────────
+btnModeVoice.onclick    = () => setMode('voice');
+btnModeTap.onclick      = () => setMode('tap');
+btnModeKeyboard.onclick = () => setMode('keyboard');
+
+function setMode(m) {
+  mode = m;
+  btnModeVoice.classList.toggle('active', m === 'voice');
+  btnModeTap.classList.toggle('active', m === 'tap');
+  btnModeKeyboard.classList.toggle('active', m === 'keyboard');
+  shortcutHint.style.display = m === 'keyboard' ? 'block' : 'none';
+  tapOverlay.style.display   = m === 'tap'      ? 'block' : 'none';
+  tapHint.style.display      = m === 'tap'      ? 'block' : 'none';
+
+  if (prompterView.style.display !== 'none') {
+    stopAll();
+    if (m === 'voice') startRecognition();
+    else if (m === 'tap') { /* 탭 대기 */ statusText.textContent = '탭으로 시작'; }
+    else startScroll();
+  }
+}
+
+// ── 탭 오버레이 ──────────────────────────────────────────────
+tapOverlay.addEventListener('click', () => {
+  if (scrollInterval) {
+    stopScroll();
+    showTapHint('탭 — 정지');
+  } else {
+    startScroll();
+    showTapHint('탭 — 스크롤 중');
+  }
+});
+
+function showTapHint(msg) {
+  tapHint.textContent = msg;
+  tapHint.classList.remove('hidden');
+  clearTimeout(tapHintTimer);
+  tapHintTimer = setTimeout(() => tapHint.classList.add('hidden'), 1500);
+}
+
+// ── 파일 로드/저장 ───────────────────────────────────────────
+btnLoad.onclick = () => fileInput.click();
+btnSave.onclick = () => {
+  const text = editor.value;
+  if (!text) return;
+  const now = new Date();
+  const ts = now.getFullYear().toString().slice(2)
+    + String(now.getMonth()+1).padStart(2,'0')
+    + String(now.getDate()).padStart(2,'0')
+    + '_' + String(now.getHours()).padStart(2,'0')
+    + String(now.getMinutes()).padStart(2,'0');
+  const blob = new Blob([text], {type:'text/plain'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = `${loadedFileName}_${ts}.txt`; a.click();
+  URL.revokeObjectURL(url);
+};
+fileInput.onchange = (e) => {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => { editor.value = ev.target.result; };
+  reader.readAsText(file);
+  loadedFileName = file.name.replace(/\.[^.]+$/, '');
+  fileInput.value = '';
+};
+
+// ── 화면 전환 ────────────────────────────────────────────────
+btnEdit.onclick = () => {
+  prompterView.style.display = 'none';
+  editorView.style.display   = 'flex';
+  stopAll();
+  btnStart.style.display = '';
+  btnStop.style.display  = 'none';
+};
+
+btnStart.onclick = () => {
+  const text = editor.value.trim(); if (!text) return;
+  buildPrompter(text);
+  editorView.style.display   = 'none';
+  prompterView.style.display = 'block';
+  btnStart.style.display = 'none';
+  btnStop.style.display  = '';
+
+  if (mode === 'voice')    startRecognition();
+  else if (mode === 'tap') { statusText.textContent = '탭으로 시작'; showTapHint('화면을 탭하면 시작/정지'); }
+  else                     startScroll();
+};
+
+btnStop.onclick = () => {
+  stopAll();
+  btnStop.style.display  = 'none';
+  btnStart.style.display = '';
+};
+
+// ── 눈 고정 모드 ─────────────────────────────────────────────
+btnEyeFix.onclick = () => {
+  eyeFixMode = !eyeFixMode;
+  btnEyeFix.classList.toggle('active', eyeFixMode);
+  eyeFixCtrl.style.display = eyeFixMode ? 'flex' : 'none';
+  if (prompterView.style.display !== 'none') buildPrompter(editor.value.trim());
+};
+eyeWidthRange.oninput = () => {
+  eyeWidthVal.textContent = eyeWidthRange.value + 'px';
+  if (prompterView.style.display !== 'none' && eyeFixMode) buildPrompter(editor.value.trim());
+};
+
+// ── 텍스트 재편 ──────────────────────────────────────────────
+function rewrapText(text, maxChars) {
+  const PUNCT = new Set([...'.!?,。、…·~']);
+  const paragraphs = text.split(/\n{2,}/);
+  return paragraphs.map(para => {
+    const flat = para.replace(/\r?\n/g, ' ').replace(/\s+/g, ' ').trim();
+    const chars = [...flat]; const lines = []; let pos = 0;
+    while (pos < chars.length) {
+      const remaining = chars.length - pos;
+      if (remaining <= maxChars) { const tail = chars.slice(pos).join('').trim(); if (tail) lines.push(tail); break; }
+      const min = Math.floor(maxChars * 0.6); let breakAt = -1;
+      for (let i = maxChars-1; i >= min; i--) { if (PUNCT.has(chars[pos+i])) { breakAt = i+1; break; } }
+      if (breakAt === -1) for (let i = maxChars-1; i >= min; i--) { if (chars[pos+i] === ' ') { breakAt = i; break; } }
+      if (breakAt === -1) breakAt = maxChars;
+      const line = chars.slice(pos, pos+breakAt).join('').trim(); if (line) lines.push(line);
+      pos += breakAt; while (pos < chars.length && chars[pos] === ' ') pos++;
+    }
+    return lines.join('\n');
+  }).join('\n\n');
+}
+
+// ── 정렬/크기 컨트롤 ─────────────────────────────────────────
+btnAlignLeft.onclick = () => { prompterText.style.textAlign='left'; btnAlignLeft.classList.add('active'); btnAlignCenter.classList.remove('active'); };
+btnAlignCenter.onclick = () => { prompterText.style.textAlign='center'; btnAlignCenter.classList.add('active'); btnAlignLeft.classList.remove('active'); };
+widthRange.oninput = () => { if (!eyeFixMode) prompterText.style.maxWidth = widthRange.value+'em'; widthVal.textContent = widthRange.value+'자'; };
+fontRange.oninput  = () => { prompterText.style.fontSize = fontRange.value+'px'; editor.style.fontSize = fontRange.value+'px'; fontVal.textContent = fontRange.value+'px'; };
+speedRange.oninput = () => { speedVal.textContent = speedRange.value; if (scrollInterval) { stopScroll(); startScroll(); } };
+
+// 수동 스크롤 감지 (음성·키보드 모드만)
+['wheel', 'touchstart'].forEach(evt =>
+  prompterScroll.addEventListener(evt, () => {
+    if (mode === 'tap') return;
+    manualScrollLock = true;
+    clearTimeout(manualScrollTimer);
+    manualScrollTimer = setTimeout(() => { manualScrollLock = false; }, 1500);
+  }, { passive: true })
+);
+
+// ── 대본 렌더링 ──────────────────────────────────────────────
+function buildPrompter(text) {
+  if (eyeFixMode) {
+    const fontSize = parseInt(prompterText.style.fontSize) || parseInt(fontRange.value) || 36;
+    const pxWidth  = parseInt(eyeWidthRange.value);
+    const maxChars = Math.max(8, Math.floor(pxWidth / fontSize));
+    prompterText.style.maxWidth = pxWidth+'px';
+    prompterText.textContent = rewrapText(text, maxChars);
+  } else {
+    prompterText.style.maxWidth = parseInt(widthRange.value)+'em';
+    prompterText.textContent = text;
+  }
+  prompterScroll.scrollTop = 0;
+}
+
+// ── 스크롤 제어 ──────────────────────────────────────────────
+function startScroll() {
+  if (scrollInterval) return;
+  const speed = parseInt(speedRange.value);
+  scrollInterval = setInterval(() => {
+    if (!manualScrollLock) prompterScroll.scrollTop += speed;
+  }, 100);
+  statusText.textContent = '스크롤 중 ▶';
+  indicator.classList.add('active');
+}
+function stopScroll() {
+  clearInterval(scrollInterval); scrollInterval = null;
+  statusText.textContent = '정지';
+  indicator.classList.remove('active');
+}
+function stopAll() {
+  stopScroll(); stopRecognition();
+  statusText.textContent = '대기 중';
+}
+
+// ── 음성 인식 ────────────────────────────────────────────────
+function startRecognition() {
+  if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+    statusText.textContent = '음성 미지원 — HTTPS 필요';
+    return;
+  }
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  recognition = new SR();
+  recognition.lang = 'ko-KR'; recognition.continuous = true; recognition.interimResults = true;
+  recognition.onstart  = () => { isRecognizing = true; indicator.classList.add('active'); statusText.textContent = '음성 감지 중...'; };
+  recognition.onend    = () => { indicator.classList.remove('active'); if (isRecognizing) setTimeout(() => { try { recognition.start(); } catch(e){} }, 300); };
+  recognition.onspeechstart = () => { clearTimeout(speechTimeout); startScroll(); };
+  recognition.onspeechend   = () => { speechTimeout = setTimeout(() => stopScroll(), 400); };
+  recognition.onresult      = () => { clearTimeout(speechTimeout); startScroll(); speechTimeout = setTimeout(() => stopScroll(), 1000); };
+  try { recognition.start(); } catch(e) {}
+}
+function stopRecognition() {
+  isRecognizing = false;
+  if (recognition) { try { recognition.stop(); } catch(e){} recognition = null; }
+  stopScroll();
+}
+
+// ── 키보드 단축키 (키보드 모드) ──────────────────────────────
+document.addEventListener('keydown', (e) => {
+  if (e.target === editor) return;
+  if (prompterView.style.display === 'none') return;
+  if (mode !== 'keyboard') return;
+  switch (e.code) {
+    case 'Space': e.preventDefault(); scrollInterval ? stopScroll() : startScroll(); break;
+    case 'ArrowUp':   e.preventDefault(); if (+speedRange.value<10){ speedRange.value=+speedRange.value+1; speedVal.textContent=speedRange.value; if(scrollInterval){stopScroll();startScroll();} } break;
+    case 'ArrowDown': e.preventDefault(); if (+speedRange.value>1) { speedRange.value=+speedRange.value-1; speedVal.textContent=speedRange.value; if(scrollInterval){stopScroll();startScroll();} } break;
+    case 'ArrowLeft':  e.preventDefault(); prompterScroll.scrollTop -= 80; break;
+    case 'ArrowRight': e.preventDefault(); prompterScroll.scrollTop += 80; break;
+    case 'KeyR': e.preventDefault(); prompterScroll.scrollTop = 0; break;
+  }
+});
+</script>
+</body>
+</html>
