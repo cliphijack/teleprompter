@@ -409,8 +409,7 @@ function startRecognition() {
   recognition.onstart  = ()=>{ isRecognizing=true; indicator.classList.add('active'); statusText.textContent='음성 감지 중...'; };
   recognition.onend    = ()=>{ indicator.classList.remove('active'); if(isRecognizing) setTimeout(()=>{ try{recognition.start();}catch(e){} },300); };
   recognition.onspeechstart = ()=>{ clearTimeout(speechTimeout); startScroll(); };
-  recognition.onspeechend   = ()=>{ speechTimeout=setTimeout(()=>stopScroll(),400); };
-  recognition.onresult      = ()=>{ clearTimeout(speechTimeout); startScroll(); speechTimeout=setTimeout(()=>stopScroll(),1000); };
+  recognition.onresult = ()=>{ clearTimeout(speechTimeout); startScroll(); speechTimeout=setTimeout(()=>stopScroll(),1500); };
   try { recognition.start(); } catch(e) {}
 }
 function stopRecognition() {
